@@ -177,13 +177,14 @@ def registrar_execucao(engine: Engine, sistema: str, ano: int, status: str,
              "fo": json.dumps(fonte, ensure_ascii=False, default=str)})
 
 
-def ultima_versao_carregada(engine: Engine, sistema: str, ano: int) -> str | None:
-    """Usado no modo incremental: compara com o last_modified do recurso CKAN."""
+def ultima_fonte_carregada(engine: Engine, sistema: str, ano: int) -> dict:
+    """Metadados da fonte (last_modified, sha256) da última carga completa bem-sucedida."""
     with engine.connect() as conn:
-        return conn.execute(text(
-            f"SELECT fonte ->> 'last_modified' FROM {SCHEMA}.etl_execucao "
+        fonte = conn.execute(text(
+            f"SELECT fonte FROM {SCHEMA}.etl_execucao "
             "WHERE sistema = :s AND ano = :a AND status = 'sucesso' AND fracao_amostra = 1 "
             "ORDER BY finalizado_em DESC LIMIT 1"), {"s": sistema, "a": ano}).scalar()
+    return fonte or {}
 
 
 def verificar_tamanho(engine: Engine) -> int:

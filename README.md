@@ -142,9 +142,10 @@ o Streamlit consulta o banco com um usuário somente leitura.**
 │   ├── load.py              # DDL, COPY no PostgreSQL, GRANTs, controle de volume, OpenSearch
 │   ├── pipeline.py          # orquestrador (CLI)
 │   ├── exportar_base_tratada.py  # exporta o banco para dados_tratados/
+│   ├── referencias/         # tabelas do IBGE e da CID-10 versionadas (usadas sem rede)
 │   ├── sql/schema.sql       # esquema estrela (tabelas, chaves, CHECKs, índices)
 │   ├── sql/views.sql        # regras de negócio em SQL (RMM, risco relativo, indicadores)
-│   └── tests/               # 25 testes unitários das regras (pytest)
+│   └── tests/               # 28 testes unitários (pytest)
 ├── terraform/               # INFRAESTRUTURA COMO CÓDIGO (Aiven)
 │   ├── main.tf              # providers, PostgreSQL, banco, usuário leitor, OpenSearch, .env
 │   ├── variables.tf         # variáveis (token marcado como sensitive)
@@ -232,7 +233,7 @@ Data de publicação informada pela API e hash SHA-256 calculado no download, gr
 |---|---|---|
 | **Volume** | 6 anos × (SIM ≈ 1,35–1,8 milhão de óbitos/ano + SINASC ≈ 2,4–2,8 milhões de nascimentos/ano) ≈ **25 milhões de registros**, ~8 GB de CSV descompactado (≈ 1,2 GB zipado). O PostgreSQL gratuito tem **1 GB**. | Leitura **em chunks direto do .zip** (nunca descompacta em disco), seleção só das colunas necessárias e **agregação no ETL** (grão ano × município × raça/cor × faixa etária). Resultado: o banco inteiro ocupa 158 MB (15% do limite). `load.verificar_tamanho()` mede o banco a cada carga e alerta acima de 80%. Amostragem controlada opcional (`ETL_AMOSTRA`) para testes rápidos. |
 | **Variedade** | CSV tabular (SIM/SINASC), JSON da API CKAN e da API do IBGE, campos multivalorados codificados em texto (`*O149*R571`), descrições textuais da CID-10. | Cada formato tem um tratamento próprio (seção 5). JSON de metadados vai para coluna **JSONB**; a cadeia de causas vira **JSONB** e documento aninhado no **OpenSearch**; texto vira índice **full-text**. |
-| **Velocidade** | As bases são publicadas uma vez por ano e **revisadas** ao longo do tempo (óbitos investigados mudam de causa). | Processamento em **lote (batch)** agendado no GitHub Actions (todo dia 5). Modo `--incremental` compara o `last_modified` do recurso na API CKAN com a última carga e só reprocessa o que mudou. Carga idempotente por ano. |
+| **Velocidade** | As bases são publicadas uma vez por ano e **revisadas** ao longo do tempo (óbitos investigados mudam de causa). | Processamento em **lote (batch)** agendado no GitHub Actions (todo dia 5). Modo `--incremental` compara a data de publicação informada pela API CKAN (sem baixar nada) ou, se a API não responder, o SHA-256 do arquivo com a última carga, e só reprocessa o que mudou. Carga idempotente por ano. |
 | **Veracidade** | Campos ignorados (raça/cor da mãe ignorada em 1,9% a 3,5% dos nascimentos, conforme o ano), códigos fora do dicionário, municípios inexistentes, linhas duplicadas, bases preliminares. | Deduplicação por hash entre chunks, normalização de códigos (inválido → "9 Ignorado"), validação do município contra o IBGE, rejeição de bases preliminares, **denominadores válidos** por indicador, `CHECK`s no banco (numerador ≤ denominador), relatório de qualidade por execução gravado em `etl_execucao` e exibido no painel. |
 | **Valor** | Indicadores interseccionais acionáveis: RMM e risco relativo por raça/cor, proxies de violência obstétrica, causas evitáveis. | 4+ KPIs principais, 17 métricas selecionáveis, drill-down até o município (ver seção 14). |
 
@@ -362,7 +363,9 @@ python -m etl.pipeline --anos 2019-2024 [--incremental] [--aceitar-preliminar] [
 Para cada ano o orquestrador ([`etl/pipeline.py`](etl/pipeline.py)):
 
 1. **Descobre** o recurso CSV do ano via `GET /api/3/action/package_show` (CKAN) e rejeita bases
-   "preliminares" (salvo `--aceitar-preliminar`).
+   "preliminares" (salvo `--aceitar-preliminar`). Se a API não responder (servidores do governo podem
+   recusar conexões de fora do Brasil, como as do GitHub Actions), usa o arquivo direto no repositório S3
+   do portal. As tabelas do IBGE e da CID-10 vêm de cópias versionadas em `etl/referencias/`.
 2. **Baixa** em streaming (blocos de 8 MB, retry exponencial, cache local por tamanho) e calcula SHA-256.
 3. **Transforma** ([`etl/transform.py`](etl/transform.py)) lendo o CSV de dentro do zip em blocos de 250 mil
    linhas. Em cada bloco: padroniza nomes de colunas → remove duplicatas (hash 64 bits, também entre
@@ -629,7 +632,7 @@ banco e estado; as URIs com senha são `sensitive` e só aparecem com `terraform
 | Acesso a banco | SQLAlchemy 2.1, psycopg 3 (`COPY`), API HTTP do OpenSearch |
 | Bancos | PostgreSQL 18 (esquema estrela, JSONB, full-text) e OpenSearch 3 |
 | Visualização | Streamlit 1.67 e Plotly 7 |
-| Qualidade e segurança | pytest (25 testes), `terraform validate`, gitleaks |
+| Qualidade e segurança | pytest (28 testes), `terraform validate`, gitleaks |
 
 ### Decisões de infraestrutura
 
@@ -747,7 +750,7 @@ cd painel-mortalidade-materna
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements.txt -r dashboard/requirements.txt
-pytest etl/tests -q                  # 25 testes das regras de negócio
+pytest etl/tests -q                  # 28 testes
 ```
 
 ### Passo 2 — Conta e token da Aiven

@@ -43,6 +43,20 @@ jobs:
           key: microdados-${{ github.run_id }}
           restore-keys: microdados-
 
+      # Diagnóstico: os runners do GitHub ficam fora do Brasil e alguns servidores do governo
+      # recusam essas conexões. O resultado vira anotação no resumo da execução.
+      - name: Testar acesso às fontes
+        continue-on-error: true
+        run: |
+          for url in \
+            "https://dadosabertos.saude.gov.br/api/ckan/api/3/action/site_read" \
+            "https://s3.sa-east-1.amazonaws.com/ckan.saude.gov.br/SIM/csv/Mortalidade_Geral_2024_csv.zip" \
+            "https://servicodados.ibge.gov.br/api/v1/localidades/regioes" \
+            "http://www2.datasus.gov.br/cid10/V2008/cid10.htm"; do
+            code=$(curl -s -o /dev/null -I -m 15 -w "%{http_code}" "$url" || true)
+            echo "::notice title=Acesso a fonte::${url%%\?*} -> HTTP ${code:-000}"
+          done
+
       - name: Executar pipeline
         env:
           # Segredos configurados em Settings > Secrets and variables > Actions
@@ -56,4 +70,10 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.incremental }}" = "true" ]; then
             FLAG="--incremental"
           fi
-          python -m etl.pipeline --anos "$ANOS" $FLAG
+          set -o pipefail
+          if ! python -m etl.pipeline --anos "$ANOS" $FLAG 2>&1 | tee etl.log; then
+            # Publica o fim do log como anotação (visível no resumo da execução)
+            echo "::error title=ETL falhou::$(grep -E 'ERROR|Error|Exception|Falha' etl.log | tail -5 | tr '\n' ' ' | cut -c1-900)"
+            exit 1
+          fi
+          echo "::notice title=ETL concluído::$(grep -E 'pulando|carregado|Concluído|Tamanho total' etl.log | tr '\n' ' ' | cut -c1-900)"

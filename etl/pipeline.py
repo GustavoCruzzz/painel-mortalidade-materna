@@ -71,23 +71,35 @@ def executar(args: argparse.Namespace) -> int:
                                 anos_preliminares=set(anos) if args.aceitar_preliminar else set())
 
     anos_carregados: list[int] = []
+    anos_com_erro: list[int] = []
     for ano in anos:
         inicio = datetime.now(timezone.utc)
         try:
-            zip_sim, rec_sim = extract.baixar_microdados("sim", ano, args.aceitar_preliminar)
-            zip_sn, rec_sn = extract.baixar_microdados("sinasc", ano, args.aceitar_preliminar)
+            rec_sim = extract.localizar_microdados("sim", ano, args.aceitar_preliminar)
+            rec_sn = extract.localizar_microdados("sinasc", ano, args.aceitar_preliminar)
         except LookupError as exc:
             log.warning("Ano %s ignorado: %s", ano, exc)
             continue
 
-        if args.incremental and engine is not None:
-            iguais = (load.ultima_versao_carregada(engine, "SIM", ano) == rec_sim.get("last_modified") and
-                      load.ultima_versao_carregada(engine, "SINASC", ano) == rec_sn.get("last_modified"))
-            if iguais:
-                log.info("Ano %s sem alterações na fonte — pulando (modo incremental)", ano)
+        incremental = args.incremental and engine is not None
+        if incremental:
+            ant_sim = load.ultima_fonte_carregada(engine, "SIM", ano)
+            ant_sn = load.ultima_fonte_carregada(engine, "SINASC", ano)
+            # 1º critério, sem baixar nada: data de publicação informada pela API CKAN
+            if (rec_sim.get("last_modified") and rec_sim.get("last_modified") == ant_sim.get("last_modified")
+                    and rec_sn.get("last_modified") == ant_sn.get("last_modified")):
+                log.info("Ano %s sem alterações na fonte (data de publicação) — pulando", ano)
                 continue
 
         try:
+            zip_sim = extract.baixar_recurso("sim", rec_sim)
+            zip_sn = extract.baixar_recurso("sinasc", rec_sn)
+            if incremental and (rec_sim["sha256"] == ant_sim.get("sha256")
+                                and rec_sn["sha256"] == ant_sn.get("sha256")):
+                # 2º critério (API indisponível ou data diferente): conteúdo idêntico ao já carregado
+                log.info("Ano %s sem alterações na fonte (SHA-256 idêntico) — pulando", ano)
+                continue
+
             obitos, obitos_mun, idade_rep, rel_sim = transform.processar_sim(zip_sim, ano, cod_mun, cod_ufs)
             nascimentos, rel_sn = transform.processar_sinasc(zip_sn, ano, cod_mun, cod_ufs)
             fato = transform.integrar_fato(nascimentos, obitos_mun)
@@ -106,6 +118,7 @@ def executar(args: argparse.Namespace) -> int:
             anos_carregados.append(ano)
         except Exception as exc:  # registra a falha e segue para o próximo ano
             log.exception("Falha no ano %s", ano)
+            anos_com_erro.append(ano)
             if engine is not None:
                 load.registrar_execucao(engine, "PIPELINE", ano, "erro", {"erro": str(exc)}, None, inicio)
             if args.parar_no_erro:
@@ -118,6 +131,9 @@ def executar(args: argparse.Namespace) -> int:
         if anos_carregados and not args.sem_opensearch:
             load.indexar_opensearch(engine, anos_carregados)
     log.info("Concluído. Anos processados: %s", anos_carregados)
+    if anos_com_erro:
+        log.error("Anos com erro: %s (detalhes em etl_execucao, status 'erro')", anos_com_erro)
+        return 1
     return 0
 
 
