@@ -11,7 +11,7 @@
 | Infraestrutura como Código (Terraform + Aiven) | [`terraform/`](terraform/) |
 | Dashboard interativo (Streamlit) | [`dashboard/`](dashboard/) |
 | Agendamento / CI | [`.github/workflows/`](.github/workflows/) |
-| Dashboard online | `https://<seu-app>.streamlit.app` *(preencher após o deploy, ver passo 6)* |
+| Dashboard online | **<https://painel-mortalidade-materna-wxkg6vbjkxbndxteouxuyc.streamlit.app/>** |
 
 ---
 
@@ -485,7 +485,7 @@ tabela de dados disponível em cada gráfico.
 
 ### Passo 1 — Clonar e instalar
 ```bash
-git clone https://github.com/<usuario>/painel-mortalidade-materna.git
+git clone https://github.com/GustavoCruzzz/painel-mortalidade-materna.git
 cd painel-mortalidade-materna
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
