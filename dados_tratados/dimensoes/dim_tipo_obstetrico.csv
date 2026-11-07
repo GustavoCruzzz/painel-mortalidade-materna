@@ -1,0 +1,5 @@
+tipo_obstetrico,descricao,entra_rmm
+direta,Obstétrica direta,True
+indireta,Obstétrica indireta,True
+nao_especificada,Obstétrica não especificada,True
+tardia,Materna tardia (43 dias a 1 ano),False

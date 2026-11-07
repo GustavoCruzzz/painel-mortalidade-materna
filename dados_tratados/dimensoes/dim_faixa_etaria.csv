@@ -1,0 +1,12 @@
+cod_faixa_etaria,descricao,idade_min,idade_max,ordem
+<10,Menos de 10 anos,0.0,9.0,0
+10-14,10 a 14 anos,10.0,14.0,1
+15-19,15 a 19 anos,15.0,19.0,2
+20-24,20 a 24 anos,20.0,24.0,3
+25-29,25 a 29 anos,25.0,29.0,4
+30-34,30 a 34 anos,30.0,34.0,5
+35-39,35 a 39 anos,35.0,39.0,6
+40-44,40 a 44 anos,40.0,44.0,7
+45-49,45 a 49 anos,45.0,49.0,8
+50+,50 anos ou mais,50.0,120.0,9
+IGN,Idade ignorada,,,10

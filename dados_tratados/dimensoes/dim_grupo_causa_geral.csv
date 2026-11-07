@@ -1,0 +1,11 @@
+cod_grupo_causa,descricao
+agressao,Agressões / homicídios (X85–Y09)
+circulatorio,Doenças do aparelho circulatório (I00–I99)
+covid19,COVID-19
+demais,Demais causas
+infecciosas,Doenças infecciosas e parasitárias (A00–B99)
+materna,Morte materna (exceto tardia)
+neoplasias,Neoplasias (C00–D48)
+outras_externas,Outras causas externas
+suicidio,Lesões autoprovocadas (X60–X84)
+transporte,Acidentes de transporte (V01–V99)

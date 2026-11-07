@@ -1,0 +1,18 @@
+dominio,codigo,descricao
+local_ocorrencia,1,Hospital
+local_ocorrencia,2,Outro estabelecimento de saúde
+local_ocorrencia,3,Domicílio
+local_ocorrencia,4,Via pública
+local_ocorrencia,5,Outros
+local_ocorrencia,6,Aldeia indígena
+local_ocorrencia,9,Ignorado
+momento_obito,1,Na gravidez
+momento_obito,2,No parto
+momento_obito,3,No abortamento
+momento_obito,4,Até 42 dias após o parto
+momento_obito,5,De 43 dias a 1 ano após a gestação
+momento_obito,8,Não ocorreu nestes períodos
+momento_obito,9,Ignorado
+sim_nao,1,Sim
+sim_nao,2,Não
+sim_nao,9,Ignorado

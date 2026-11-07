@@ -1,0 +1,10 @@
+grupo_causa,descricao,cids
+aborto,Gravidez que termina em aborto,O00–O08
+hemorragia,"Hemorragias (placenta prévia, descolamento, pós-parto)","O20, O44–O46, O67, O72"
+hipertensao,Síndromes hipertensivas (pré-eclâmpsia/eclâmpsia),O10–O16
+indiretas,Doenças preexistentes agravadas pela gestação,"O24–O25, O98–O99"
+infeccao,Infecção puerperal,O85–O86
+nao_especificada,Morte obstétrica de causa não especificada,O95
+outras_diretas,Outras complicações obstétricas diretas,demais O00–O92
+outras_especiais,Causas fora do cap. XV com vínculo gestacional,"A34, F53, M83, D39.2, E23.0"
+tardia,Morte materna tardia / sequelas,O96–O97

@@ -1,0 +1,246 @@
+{
+  "descricao": "Base tratada do Painel de Mortalidade Materna (SIM + SINASC 2019-2024)",
+  "origem": "Exportada do Aiven for PostgreSQL, esquema saude_materna",
+  "tabelas": {
+    "fato_saude_materna": {
+      "linhas": 591526,
+      "colunas": [
+        "ano",
+        "cod_municipio",
+        "cod_raca_cor",
+        "cod_faixa_etaria",
+        "cod_uf",
+        "nascidos_vivos",
+        "partos_info_valida",
+        "partos_cesareos",
+        "robson_classificados",
+        "robson1_total",
+        "robson1_cesareas",
+        "baixo_risco_total",
+        "cesareas_eletivas_baixo_risco",
+        "prenatal_classificado",
+        "prenatal_inadequado",
+        "consultas_info_valida",
+        "menos_7_consultas",
+        "inicio_prenatal_valido",
+        "inicio_prenatal_tardio",
+        "local_info_valida",
+        "partos_fora_estabelecimento",
+        "apgar5_valido",
+        "apgar5_baixo",
+        "gestacao_valida",
+        "prematuros",
+        "peso_valido",
+        "baixo_peso",
+        "obitos_maternos",
+        "obitos_maternos_diretos",
+        "obitos_maternos_indiretos",
+        "obitos_maternos_tardios",
+        "obitos_sem_assistencia",
+        "obitos_fora_estabelecimento",
+        "obitos_investigados"
+      ]
+    },
+    "fato_obito_materno": {
+      "linhas": 12080,
+      "colunas": [
+        "id_obito",
+        "ano",
+        "cod_uf",
+        "cod_raca_cor",
+        "cod_faixa_etaria",
+        "cod_escolaridade",
+        "causa_basica",
+        "causa_basica_descricao",
+        "tipo_obstetrico",
+        "grupo_causa",
+        "cod_momento_obito",
+        "cod_local_ocorrencia",
+        "cod_assistencia_medica",
+        "cod_necropsia",
+        "investigado",
+        "cadeia_causas",
+        "texto_causas"
+      ]
+    },
+    "fato_obito_idade_reprodutiva": {
+      "linhas": 70885,
+      "colunas": [
+        "ano",
+        "cod_uf",
+        "cod_sexo",
+        "cod_raca_cor",
+        "cod_faixa_etaria",
+        "cod_grupo_causa",
+        "n_obitos",
+        "n_gestante_puerpera"
+      ]
+    },
+    "dim_tempo": {
+      "linhas": 6,
+      "colunas": [
+        "ano",
+        "periodo",
+        "base_preliminar"
+      ]
+    },
+    "dim_localidade": {
+      "linhas": 5598,
+      "colunas": [
+        "cod_municipio",
+        "cod_municipio_ibge7",
+        "nome_municipio",
+        "cod_uf",
+        "sigla_uf",
+        "nome_uf",
+        "sigla_regiao",
+        "nome_regiao",
+        "municipio_ignorado"
+      ]
+    },
+    "dim_raca_cor": {
+      "linhas": 6,
+      "colunas": [
+        "cod_raca_cor",
+        "descricao",
+        "grupo_ibge"
+      ]
+    },
+    "dim_faixa_etaria": {
+      "linhas": 11,
+      "colunas": [
+        "cod_faixa_etaria",
+        "descricao",
+        "idade_min",
+        "idade_max",
+        "ordem"
+      ]
+    },
+    "dim_escolaridade": {
+      "linhas": 7,
+      "colunas": [
+        "cod_escolaridade",
+        "descricao"
+      ]
+    },
+    "dim_sexo": {
+      "linhas": 3,
+      "colunas": [
+        "cod_sexo",
+        "descricao"
+      ]
+    },
+    "dim_tipo_obstetrico": {
+      "linhas": 4,
+      "colunas": [
+        "tipo_obstetrico",
+        "descricao",
+        "entra_rmm"
+      ]
+    },
+    "dim_grupo_causa_materna": {
+      "linhas": 9,
+      "colunas": [
+        "grupo_causa",
+        "descricao",
+        "cids"
+      ]
+    },
+    "dim_grupo_causa_geral": {
+      "linhas": 10,
+      "colunas": [
+        "cod_grupo_causa",
+        "descricao"
+      ]
+    },
+    "dim_dominio": {
+      "linhas": 17,
+      "colunas": [
+        "dominio",
+        "codigo",
+        "descricao"
+      ]
+    },
+    "dim_cid10": {
+      "linhas": 14236,
+      "colunas": [
+        "cid",
+        "descricao"
+      ]
+    }
+  },
+  "arquivos": {
+    "fatos/fato_saude_materna.parquet": {
+      "bytes": 9154875,
+      "sha256": "2dc28601067cec5ce97e76d590924265dac08c396e8061e9e9c010f10f4abdc2"
+    },
+    "amostras_csv/fato_saude_materna_amostra.csv": {
+      "bytes": 86684,
+      "sha256": "9c6a0241eb912b74eeefa03d9ce683603127849473c0a5e7201adc1f87ef2802"
+    },
+    "fatos/fato_obito_materno.parquet": {
+      "bytes": 655197,
+      "sha256": "1be1199b16123258bec01f58203aeed0b0e66a98fdd92e3d737f8ce485a6a55d"
+    },
+    "amostras_csv/fato_obito_materno_amostra.csv": {
+      "bytes": 411377,
+      "sha256": "8c15f6de94f70258dc22f423609d3650e0ea59a0a25470885740d96c2627b60d"
+    },
+    "fatos/fato_obito_idade_reprodutiva.parquet": {
+      "bytes": 101154,
+      "sha256": "d1f5b5b68d81edb5d407d3db35bd1161a17448925d937a1e7c322afa41f84fe7"
+    },
+    "amostras_csv/fato_obito_idade_reprodutiva_amostra.csv": {
+      "bytes": 32816,
+      "sha256": "18b996073ba19adc7d3359825ad9a6f7c695b4865276116a08eb589a531dfc0b"
+    },
+    "dimensoes/dim_tempo.csv": {
+      "bytes": 168,
+      "sha256": "8a7b2e44a2ba7383a15a676d78374584a612154b0f6c8492d35b65d23a7eada7"
+    },
+    "dimensoes/dim_localidade.csv": {
+      "bytes": 345836,
+      "sha256": "ed2269f733a60c11757d835c0d433b08b11c8aedf1bcd6d0157b69c63c3e0ce4"
+    },
+    "dimensoes/dim_raca_cor.csv": {
+      "bytes": 138,
+      "sha256": "5a1c720a676829b4b043a2f846194ec3f04cf9bfbd312504c6db816d884ab395"
+    },
+    "dimensoes/dim_faixa_etaria.csv": {
+      "bytes": 389,
+      "sha256": "bbc1320a9cb8d6423bc5f34953b6a50be4b6f9cce37ac4aa9bac6dbf35249516"
+    },
+    "dimensoes/dim_escolaridade.csv": {
+      "bytes": 179,
+      "sha256": "ef538fb7dc53a3875ce274bc0ce34603270e3eefed130de65a8935db2e8fdeb5"
+    },
+    "dimensoes/dim_sexo.csv": {
+      "bytes": 53,
+      "sha256": "d5171f3b87d36bd0fa1294a3b5baaa16f0d25440254a975b108d5880eb3fbef3"
+    },
+    "dimensoes/dim_tipo_obstetrico.csv": {
+      "bytes": 200,
+      "sha256": "efd6cfae7e364ef478b718856e61fbf7a081c1c589be43045847466aee06f68e"
+    },
+    "dimensoes/dim_grupo_causa_materna.csv": {
+      "bytes": 655,
+      "sha256": "65f9561c1e9f23d8bc20f028293df99e9e1e3db5578f71ab6411c7db1fc9ec9e"
+    },
+    "dimensoes/dim_grupo_causa_geral.csv": {
+      "bytes": 433,
+      "sha256": "3b9043c69b1dfe4ae59e0edbb1f2afac82bc6da7f5967abe179d7748d56c91d6"
+    },
+    "dimensoes/dim_dominio.csv": {
+      "bytes": 556,
+      "sha256": "1f9b2f123c644f5a981cef0421ae77b59ce54b83abacc9992bb445e198f1846a"
+    },
+    "dimensoes/dim_cid10.csv": {
+      "bytes": 961385,
+      "sha256": "a95b42bcceec9f3c67abf80227ad2dc5c3f7b8cd718b45df8321d171828bc2f5"
+    },
+    "controle/versao_fontes_e_qualidade.json": {
+      "bytes": 9523,
+      "sha256": "a297c24aa228caa6e71df63879a797cbd37a851a0b3368951427bcedc3923a52"
+    }
+  }
+}

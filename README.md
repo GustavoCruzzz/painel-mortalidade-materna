@@ -12,24 +12,42 @@
 | Dashboard interativo (Streamlit) | [`dashboard/`](dashboard/) |
 | Agendamento / CI | [`.github/workflows/`](.github/workflows/) |
 | Dashboard online | **<https://painel-mortalidade-materna-wxkg6vbjkxbndxteouxuyc.streamlit.app/>** |
+| Base de dados tratada (Parquet + CSV + manifesto) | [`dados_tratados/`](dados_tratados/) |
+| Documentos das entregas (PDF) | [`docs/`](docs/) |
+
+### Entrega do Marco 2: onde está cada item
+
+| Entregável | Onde encontrar |
+|---|---|
+| 1. Base de dados tratada | [`dados_tratados/`](dados_tratados/) · origem e versão original na [seção 3](#3-dados-utilizados) · decisões na [seção 7](#7-tratamento-realizado-problemas-decisões-e-justificativas) |
+| 2. Processo de tratamento | [`etl/`](etl/) · [seção 8](#8-processo-de-ingestão-e-etl) (etapas) · [seção 11](#11-regras-de-negócio) (regras) |
+| 3. Base armazenada em banco | Aiven for PostgreSQL + OpenSearch · estrutura, tipos e relacionamentos nas [seções 9 e 10](#9-modelagem-e-justificativa-da-escolha-dos-bancos) · quantidade armazenada na [seção 9](#quantidade-de-dados-armazenados) |
+| 4. Infraestrutura (Terraform) | [`terraform/`](terraform/) · [seção 12](#12-infraestrutura-terraform--aiven) |
+| 5. Segurança das informações | [seção 13](#13-segurança-da-informação) · [`.gitignore`](.gitignore) · varredura gitleaks em [`ci.yml`](.github/workflows/ci.yml) |
+| 6. Repositório organizado | estrutura de diretórios na [seção 2](#estrutura-do-repositório) |
+| 7. Documentação | este README · execução passo a passo na [seção 15](#15-execução-e-reprodução-deployment-guide) |
+| Banco com a carga realizada | 694.410 linhas, 158 MB (15% de 1 GB), carga de 07/11/2026 |
 
 ---
 
 ## Sumário
 1. [Entendimento do negócio e escopo](#1-entendimento-do-negócio-e-escopo)
 2. [Arquitetura da solução](#2-arquitetura-da-solução)
-3. [Análise dos 5 V's](#3-análise-dos-5-vs-aplicada-ao-dataset)
-4. [Classificação dos tipos de dados](#4-classificação-dos-tipos-de-dados)
-5. [Aspectos legais: LGPD e dados abertos](#5-aspectos-legais-lgpd-e-dados-abertos)
-6. [Ingestão e ETL](#6-ingestão-e-etl)
-7. [Modelagem e escolha dos bancos](#7-modelagem-e-justificativa-da-escolha-dos-bancos)
-8. [Dicionário de dados](#8-dicionário-de-dados)
-9. [Regras de negócio](#9-regras-de-negócio)
-10. [Dashboard](#10-dashboard-dinâmico)
-11. [Segurança da informação](#11-segurança-da-informação)
-12. [Guia de reprodução (Deployment Guide)](#12-guia-de-reprodução-deployment-guide)
-13. [Roteiro do pitch (10 min)](#13-roteiro-sugerido-para-o-pitch-de-10-minutos)
-14. [Limitações e referências](#14-limitações-e-referências)
+3. [Dados utilizados](#3-dados-utilizados)
+4. [Análise dos 5 V's](#4-análise-dos-5-vs-aplicada-ao-dataset)
+5. [Classificação dos tipos de dados](#5-classificação-dos-tipos-de-dados)
+6. [Aspectos legais: LGPD e dados abertos](#6-aspectos-legais-lgpd-e-dados-abertos)
+7. [Tratamento realizado](#7-tratamento-realizado-problemas-decisões-e-justificativas)
+8. [Processo de ingestão e ETL](#8-processo-de-ingestão-e-etl)
+9. [Modelagem e escolha dos bancos](#9-modelagem-e-justificativa-da-escolha-dos-bancos)
+10. [Dicionário de dados](#10-dicionário-de-dados)
+11. [Regras de negócio](#11-regras-de-negócio)
+12. [Infraestrutura (Terraform + Aiven)](#12-infraestrutura-terraform--aiven)
+13. [Segurança da informação](#13-segurança-da-informação)
+14. [Dashboard](#14-dashboard-dinâmico)
+15. [Execução e reprodução (Deployment Guide)](#15-execução-e-reprodução-deployment-guide)
+16. [Roteiro do pitch (10 min)](#16-roteiro-sugerido-para-o-pitch-de-10-minutos)
+17. [Limitações e referências](#17-limitações-e-referências)
 
 ---
 
@@ -80,7 +98,7 @@ flowchart TB
     subgraph ETL["Ingestão & ETL · Python/Pandas (local ou GitHub Actions agendado)"]
         E["extract.py<br/>descoberta via API + download em streaming"]
         T["transform.py<br/>leitura em chunks de 250 mil linhas,<br/>dedup por hash, tipagem, LGPD"]
-        R["regras_negocio.py<br/>RN-00 a RN-09"]
+        R["regras_negocio.py<br/>RN-00 a RN-10"]
         P[("data/processed<br/>Parquet por ano")]
         L["load.py<br/>COPY + upsert idempotente"]
     end
@@ -115,46 +133,108 @@ o Streamlit consulta o banco com um usuário somente leitura.**
 ### Estrutura do repositório
 
 ```
-├── etl/
+├── etl/                     # PROCESSO DE TRATAMENTO (Python + Pandas)
 │   ├── config.py            # parâmetros e leitura de credenciais do ambiente
 │   ├── dominios.py          # tabelas de código (raça/cor, faixas, escolaridade, grupos de causa…)
-│   ├── extract.py           # API CKAN, IBGE, CID-10, download em streaming com retry
+│   ├── extract.py           # API CKAN, IBGE, CID-10, download em streaming com SHA-256
 │   ├── transform.py         # leitura em chunks, deduplicação, limpeza e agregação (SIM e SINASC)
-│   ├── regras_negocio.py    # regras RN-00…RN-09 (funções vetorizadas e testadas)
+│   ├── regras_negocio.py    # conversão de tipos e regras RN-00…RN-10 (funções testadas)
 │   ├── load.py              # DDL, COPY no PostgreSQL, GRANTs, controle de volume, OpenSearch
 │   ├── pipeline.py          # orquestrador (CLI)
+│   ├── exportar_base_tratada.py  # exporta o banco para dados_tratados/
 │   ├── sql/schema.sql       # esquema estrela (tabelas, chaves, CHECKs, índices)
 │   ├── sql/views.sql        # regras de negócio em SQL (RMM, risco relativo, indicadores)
-│   └── tests/               # testes unitários das regras (pytest)
-├── terraform/
-│   ├── main.tf              # provider Aiven, PostgreSQL, banco, usuário leitor, OpenSearch, .env
-│   ├── variables.tf
-│   ├── outputs.tf
-│   └── terraform.tfvars.example
-├── dashboard/
+│   └── tests/               # 25 testes unitários das regras (pytest)
+├── terraform/               # INFRAESTRUTURA COMO CÓDIGO (Aiven)
+│   ├── main.tf              # providers, PostgreSQL, banco, usuário leitor, OpenSearch, .env
+│   ├── variables.tf         # variáveis (token marcado como sensitive)
+│   ├── outputs.tf           # saídas (URIs com senha marcadas como sensitive)
+│   ├── terraform.tfvars.example  # modelo, sem valores reais
+│   └── .terraform.lock.hcl  # versões fixas dos providers
+├── dados_tratados/          # BASE TRATADA: fatos em Parquet, dimensões em CSV, manifesto SHA-256
+├── dashboard/               # VISUALIZAÇÃO (Streamlit)
 │   ├── app.py               # aplicação Streamlit (6 abas)
 │   ├── dados.py             # consultas SQL parametrizadas + busca OpenSearch
 │   ├── metricas.py          # catálogo de métricas e paleta de cores
 │   └── requirements.txt
+├── docs/                    # DOCUMENTAÇÃO das entregas em PDF
 ├── .github/workflows/
 │   ├── etl.yml              # ETL agendado (batch mensal, incremental)
 │   └── ci.yml               # testes, terraform validate, varredura de segredos (gitleaks)
-├── .streamlit/config.toml   # tema do painel
+├── .streamlit/              # tema do painel + modelo de secrets (sem valores reais)
 ├── .env.example             # modelo de variáveis de ambiente (sem segredos)
+├── .gitignore               # bloqueia .env, tfstate, tfvars, secrets e microdados brutos
+├── README.md                # esta documentação
 └── requirements.txt         # dependências do ETL
 ```
 
 ---
 
-## 3. Análise dos 5 V's aplicada ao dataset
+## 3. Dados utilizados
+
+### Fonte e identificação da base
+
+| Base | Conteúdo | Identificação | Formato |
+|---|---|---|---|
+| **SIM** – Sistema de Informação sobre Mortalidade | 1 linha por óbito, ~90 colunas | Conjunto `sim` no [Portal de Dados Abertos do SUS](https://dadosabertos.saude.gov.br), recurso "Mortalidade Geral AAAA" | CSV `;` latin-1 em .zip |
+| **SINASC** – Sistema de Informação sobre Nascidos Vivos | 1 linha por nascimento, ~60 colunas | Conjunto `sistema-de-informacao-sobre-nascidos-vivos-sinasc`, recurso "Nascidos Vivos - AAAA" | CSV `;` latin-1 em .zip |
+| API de Localidades do IBGE | 5.571 municípios, UFs e regiões | `servicodados.ibge.gov.br/api/v1/localidades/municipios` | JSON |
+| Tabela CID-10 do DATASUS | 12.451 subcategorias com descrição | `CID10CSV.zip` (versão 2008) | CSV em .zip |
+
+Publicador: Ministério da Saúde. Licença: Creative Commons Atribuição (CC-BY). Os arquivos são localizados
+pela API CKAN do portal (`package_show`), sem links fixos no código.
+
+### Período e recorte
+
+* **Período:** 2019 a 2024, as seis bases consolidadas mais recentes. 2025 é publicada como "preliminar" e
+  fica fora por padrão, porque óbitos ainda em investigação mudam de causa depois.
+* **Território:** Brasil inteiro, por município de residência.
+* **Escopo:** todos os nascidos vivos (denominador), todas as mortes maternas (numerador) e os óbitos de
+  pessoas de 10 a 49 anos (comparação de gênero). Os demais óbitos são lidos, mas não armazenados.
+
+### Características relevantes da base
+
+* **Volume:** 25.021.734 linhas (9.276.519 óbitos e 15.745.215 nascimentos), ~1,2 GB compactado e ~8 GB
+  descompactado, frente a um banco gratuito de 1 GB.
+* **Tudo é texto codificado:** raça/cor, sexo, local e tipo de parto chegam como códigos (`1`, `2`, `9`…) que
+  só têm significado com os dicionários oficiais. A idade do SIM é um código de 3 dígitos (`425` = 25 anos).
+* **Informação ignorada é comum:** raça/cor da mãe ausente em 2,8% dos nascimentos, por exemplo.
+* **Campos semiestruturados:** a cadeia de causas do atestado de óbito vem como `*O149*R571` em cinco colunas.
+* **Dados sensíveis:** dados de saúde são dados pessoais sensíveis pela LGPD, mesmo anonimizados na origem.
+* **A base muda:** o Ministério republica os arquivos quando revisa óbitos investigados (o SIM 2022 e 2023
+  foi republicado em 29/10/2026), por isso cada carga registra a versão usada.
+
+### Versão original utilizada
+
+Data de publicação informada pela API e hash SHA-256 calculado no download, gravados em `etl_execucao` e em
+[`dados_tratados/controle/`](dados_tratados/controle/versao_fontes_e_qualidade.json).
+
+| Sistema | Ano | Arquivo | Publicado em | SHA-256 (início) | Linhas |
+|---|---|---|---|---|---:|
+| SIM | 2019 | `Mortalidade_Geral_2019_csv.zip` | 14/09/2026 | `66501b7348ad77d8` | 1.349.801 |
+| SIM | 2020 | `Mortalidade_Geral_2020_csv.zip` | 14/09/2026 | `ac626dff18876eaa` | 1.556.824 |
+| SIM | 2021 | `Mortalidade_Geral_2021_csv.zip` | 14/09/2026 | `6a8fe8077cf11cbf` | 1.832.649 |
+| SIM | 2022 | `Mortalidade_Geral_2022_csv.zip` | 29/10/2026 | `b8fb61ab39b2408b` | 1.544.266 |
+| SIM | 2023 | `Mortalidade_Geral_2023_csv.zip` | 29/10/2026 | `4409b41e945506fb` | 1.465.610 |
+| SIM | 2024 | `Mortalidade_Geral_2024_csv.zip` | 11/11/2025 | `a68437fc88d7e3be` | 1.527.369 |
+| SINASC | 2019 | `SINASC_2019_csv.zip` | 08/05/2026 | `4d528a8b6338ac3d` | 2.849.146 |
+| SINASC | 2020 | `SINASC_2020_csv.zip` | 08/05/2026 | `d06af4961ab021cf` | 2.730.145 |
+| SINASC | 2021 | `SINASC_2021_csv.zip` | 08/05/2026 | `240eb1f03aa9cb5e` | 2.677.101 |
+| SINASC | 2022 | `SINASC_2022_csv.zip` | 08/05/2026 | `89e6f791a2470588` | 2.561.922 |
+| SINASC | 2023 | `SINASC_2023_csv.zip` | 08/05/2026 | `c4ce57f7aa539023` | 2.537.576 |
+| SINASC | 2024 | `SINASC_2024_csv.zip` | 08/05/2026 | `27e55de6359e1b19` | 2.389.325 |
+
+---
+
+## 4. Análise dos 5 V's aplicada ao dataset
 
 | V | Como aparece neste projeto | Decisão de engenharia |
 |---|---|---|
 | **Volume** | 6 anos × (SIM ≈ 1,35–1,8 milhão de óbitos/ano + SINASC ≈ 2,4–2,8 milhões de nascimentos/ano) ≈ **25 milhões de registros**, ~8 GB de CSV descompactado (≈ 1,2 GB zipado). O PostgreSQL gratuito tem **1 GB**. | Leitura **em chunks direto do .zip** (nunca descompacta em disco), seleção só das colunas necessárias e **agregação no ETL** (grão ano × município × raça/cor × faixa etária). Resultado: o banco inteiro ocupa 158 MB (15% do limite). `load.verificar_tamanho()` mede o banco a cada carga e alerta acima de 80%. Amostragem controlada opcional (`ETL_AMOSTRA`) para testes rápidos. |
-| **Variedade** | CSV tabular (SIM/SINASC), JSON da API CKAN e da API do IBGE, campos multivalorados codificados em texto (`*O149*R571`), descrições textuais da CID-10. | Cada formato tem um tratamento próprio (seção 4). JSON de metadados vai para coluna **JSONB**; a cadeia de causas vira **JSONB** e documento aninhado no **OpenSearch**; texto vira índice **full-text**. |
+| **Variedade** | CSV tabular (SIM/SINASC), JSON da API CKAN e da API do IBGE, campos multivalorados codificados em texto (`*O149*R571`), descrições textuais da CID-10. | Cada formato tem um tratamento próprio (seção 5). JSON de metadados vai para coluna **JSONB**; a cadeia de causas vira **JSONB** e documento aninhado no **OpenSearch**; texto vira índice **full-text**. |
 | **Velocidade** | As bases são publicadas uma vez por ano e **revisadas** ao longo do tempo (óbitos investigados mudam de causa). | Processamento em **lote (batch)** agendado no GitHub Actions (todo dia 5). Modo `--incremental` compara o `last_modified` do recurso na API CKAN com a última carga e só reprocessa o que mudou. Carga idempotente por ano. |
 | **Veracidade** | Campos ignorados (raça/cor da mãe ignorada em 1,9% a 3,5% dos nascimentos, conforme o ano), códigos fora do dicionário, municípios inexistentes, linhas duplicadas, bases preliminares. | Deduplicação por hash entre chunks, normalização de códigos (inválido → "9 Ignorado"), validação do município contra o IBGE, rejeição de bases preliminares, **denominadores válidos** por indicador, `CHECK`s no banco (numerador ≤ denominador), relatório de qualidade por execução gravado em `etl_execucao` e exibido no painel. |
-| **Valor** | Indicadores interseccionais acionáveis: RMM e risco relativo por raça/cor, proxies de violência obstétrica, causas evitáveis. | 4+ KPIs principais, 17 métricas selecionáveis, drill-down até o município (ver seção 10). |
+| **Valor** | Indicadores interseccionais acionáveis: RMM e risco relativo por raça/cor, proxies de violência obstétrica, causas evitáveis. | 4+ KPIs principais, 17 métricas selecionáveis, drill-down até o município (ver seção 14). |
 
 Volumes reais processados (saída do ETL):
 
@@ -194,7 +274,7 @@ de 1 GB.** Tempo de processamento: ~3 min por ano.
 
 ---
 
-## 4. Classificação dos tipos de dados
+## 5. Classificação dos tipos de dados
 
 | Dado | Tipo | Origem / formato | Tratamento |
 |---|---|---|---|
@@ -207,7 +287,7 @@ de 1 GB.** Tempo de processamento: ~3 min por ano.
 
 ---
 
-## 5. Aspectos legais: LGPD e dados abertos
+## 6. Aspectos legais: LGPD e dados abertos
 
 * **Licença:** SIM e SINASC são publicados no Portal de Dados Abertos do SUS sob **CC-BY** (atribuição),
   já **anonimizados** pelo Ministério da Saúde (sem nome, CPF, endereço ou número da declaração).
@@ -231,7 +311,49 @@ de 1 GB.** Tempo de processamento: ~3 min por ano.
 
 ---
 
-## 6. Ingestão e ETL
+## 7. Tratamento realizado: problemas, decisões e justificativas
+
+A regra geral foi **não descartar registros válidos**: um nascimento ou óbito com um campo ruim continua
+contado, e só aquele campo vira "Ignorado". Descartar linhas inteiras enviesaria justamente os grupos com
+pior registro, que são os mais vulneráveis. Os números vêm do relatório de qualidade gravado a cada carga.
+
+### Problemas encontrados na base
+
+| Problema | Exemplo | Quantidade (2019–2024) |
+|---|---|---|
+| Linhas duplicadas | Mesma linha repetida no arquivo | 112 no SIM, 105 no SINASC |
+| Raça/cor ignorada ou fora do dicionário | `RACACORMAE` vazio ou `9` | 445.202 nascimentos (2,8%) |
+| Município de residência inexistente no IBGE | Código desativado ou digitado errado | 14.601 óbitos e 453 nascimentos |
+| Idade em código | `IDADE = 425` significa 25 anos | Todas as linhas do SIM |
+| Números fora da faixa plausível | Peso de 50 g, 60 semanas de gestação | Viram nulo no indicador afetado |
+| Causas em texto multivalorado | `*O149*R571` em 5 colunas | Todos os óbitos |
+| Colunas com dados sensíveis | Data exata, estabelecimento, ocupação | ~70 colunas do SIM, ~45 do SINASC |
+| Volume maior que o banco | ~8 GB de CSV para 1 GB de banco | — |
+
+### Decisões, transformações e justificativas
+
+| Decisão / transformação | Justificativa | Impacto medido |
+|---|---|---|
+| Ler todas as colunas como texto e tipar depois | Evita que o Pandas transforme `01` em `1` ou em decimal | Nenhum código corrompido |
+| Padronizar nomes em `snake_case` minúsculo | Mesmos nomes no Python, no SQL e na documentação | `DTOBITO` → `dtobito` |
+| Remover duplicatas por hash de 64 bits, também entre blocos | Linhas idênticas inflariam as contagens; o hash compara blocos sem guardar tudo em memória | 217 linhas removidas |
+| Manter só 20 colunas do SIM e 15 do SINASC | Minimização da LGPD (art. 6º, III) e redução de volume | Dados sensíveis nunca gravados |
+| Código fora do dicionário → `9` (Ignorado) | Mantém o registro no total e torna a falta de informação visível no painel | Categoria "Ignorada" em todas as dimensões |
+| Número fora da faixa plausível → nulo | É erro de digitação; o nulo sai só do denominador daquele indicador | Total de nascidos vivos preservado |
+| Município inexistente → "município ignorado" da UF (`UU0000`) | O registro continua somando no estado e na região | Nenhum registro descartado |
+| Decodificar `IDADE`, extrair o ano de `DDMMAAAA`, converter peso, semanas e Apgar para inteiro | Permite calcular faixas e indicadores | Tipos finais no dicionário (seção 10) |
+| Transformar `*O149*R571` em lista JSON | Permite buscar e filtrar por qualquer causa do atestado | Coluna `JSONB` + documento no OpenSearch |
+| Classificar a morte materna pela CID-10 (RN-02) | Definição da OMS: diretas, indiretas e não especificadas entram na RMM; tardias não | 10.556 óbitos maternos e 1.524 tardios |
+| Usar o ano do arquivo e rejeitar bases preliminares | Padrão das estatísticas oficiais; dados em investigação distorcem a série | 0 registros com data de outro ano |
+| Agregar em ano × município × raça/cor × faixa etária | Cabe em 1 GB, protege a privacidade e responde ao painel com `SUM` | 25 milhões de linhas → 591.526 |
+| Generalizar os registros individuais de morte materna | Em municípios pequenos, data + idade + local poderiam identificar a mulher | Idade → faixa, data → ano, município → UF, número da declaração → hash |
+| Não usar amostragem na carga final | Morte materna é rara (~1.760 por ano); amostrar perderia precisão por raça e UF | 100% dos registros |
+
+A sequência técnica dessas transformações está na seção 8, e as regras de negócio na seção 11.
+
+---
+
+## 8. Processo de ingestão e ETL
 
 ```
 python -m etl.pipeline --anos 2019-2024 [--incremental] [--aceitar-preliminar] [--sem-banco] [--sem-opensearch]
@@ -258,7 +380,7 @@ pelo tamanho do chunk.
 
 ---
 
-## 7. Modelagem e justificativa da escolha dos bancos
+## 9. Modelagem e justificativa da escolha dos bancos
 
 ### Esquema estrela (PostgreSQL)
 
@@ -334,9 +456,29 @@ estrangeiras para todas as dimensões, `CHECK`s de consistência (numerador ≤ 
 O OpenSearch é **opcional** (como no guia): `habilitar_opensearch = false` no Terraform desliga o serviço
 e o painel passa a usar a busca full-text do próprio PostgreSQL (`tsvector`), sem perder funcionalidade.
 
+### Quantidade de dados armazenados
+
+Contagem com `COUNT(*)` e tamanho com `pg_total_relation_size` (dados + índices) no Aiven for PostgreSQL,
+após a carga de 07/11/2026. **Total: 158 MB, 15% do limite de 1 GB.**
+
+| Tabela | Tipo | Linhas | Tamanho |
+|---|---|---:|---:|
+| `fato_saude_materna` | fato | 591.526 | 125,7 MB |
+| `fato_obito_materno` | fato | 12.080 | 12,7 MB |
+| `fato_obito_idade_reprodutiva` | fato | 70.885 | 7,8 MB |
+| `dim_cid10` | dimensão | 14.236 | 1,9 MB |
+| `dim_localidade` | dimensão | 5.598 | 0,7 MB |
+| Outras 9 dimensões | dimensão | 73 | 0,2 MB |
+| `etl_execucao` | controle | 12 | 0,1 MB |
+| **Total PostgreSQL** | | **694.410** | **158 MB** |
+| Índice `obitos-maternos` (OpenSearch) | documentos | 12.080 | 3,8 MB |
+
+Essas linhas contêm, agregados, todos os 15.745.110 nascidos vivos e todos os óbitos do escopo.
+A mesma base está exportada em [`dados_tratados/`](dados_tratados/).
+
 ---
 
-## 8. Dicionário de dados
+## 10. Dicionário de dados
 
 Esquema `saude_materna`. Códigos seguem os dicionários oficiais do SIM e do SINASC.
 
@@ -417,7 +559,7 @@ Views de negócio: `vw_fato_saude_materna`, `vw_rmm_uf_raca`, `vw_risco_relativo
 
 ---
 
-## 9. Regras de negócio
+## 11. Regras de negócio
 
 Todas implementadas em [`etl/regras_negocio.py`](etl/regras_negocio.py) (com testes em
 [`etl/tests/`](etl/tests/)) e, para as métricas, também em SQL em [`etl/sql/views.sql`](etl/sql/views.sql).
@@ -438,7 +580,122 @@ Todas implementadas em [`etl/regras_negocio.py`](etl/regras_negocio.py) (com tes
 
 ---
 
-## 10. Dashboard dinâmico
+## 12. Infraestrutura (Terraform + Aiven)
+
+Toda a camada de dados é criada por código em [`terraform/`](terraform/), sem cliques no console.
+Ela está provisionada no projeto Aiven `ucsal-big-data-project`, região **DigitalOcean Nova York (`do-nyc`)**,
+com custo zero (preço por hora dos dois planos conferido na API da Aiven: US$ 0,000).
+
+### Serviços utilizados
+
+| Serviço | Plano / versão | Papel |
+|---|---|---|
+| Aiven for PostgreSQL | `free-1-1gb` · PostgreSQL 18.6 · 1 GB de disco | Banco relacional, fonte da verdade |
+| Aiven for OpenSearch | `free-4-20` · OpenSearch 3.6 | Banco não relacional, busca textual |
+| GitHub + GitHub Actions | gratuito | Versionamento, CI e ETL agendado |
+| Streamlit Community Cloud | gratuito | Hospedagem do dashboard |
+
+### Recursos provisionados pelo Terraform
+
+| Recurso | Nome criado | O que é |
+|---|---|---|
+| `data.aiven_project.projeto` | (projeto existente) | Lê o projeto da conta Aiven, não cria nada |
+| `aiven_pg.pg` | `materna-pg` | Serviço PostgreSQL gratuito, TLS obrigatório |
+| `aiven_pg_database.saude_materna` | `saude_materna` | Banco lógico do projeto |
+| `random_password.leitor` | — | Senha aleatória de 32 caracteres para o leitor |
+| `aiven_pg_user.dashboard` | `dashboard_leitor` | Usuário somente leitura do dashboard |
+| `aiven_opensearch.os[0]` | `materna-os` | Serviço OpenSearch gratuito (desligável com `habilitar_opensearch = false`) |
+| `local_sensitive_file.env[0]` | `.env` | Arquivo local com as URIs de conexão, fora do Git |
+
+`terraform apply` criou os 6 recursos em cerca de 6 minutos. As saídas (`outputs.tf`) mostram host, porta,
+banco e estado; as URIs com senha são `sensitive` e só aparecem com `terraform output -raw <nome>`.
+
+### Arquivos
+
+| Arquivo | Conteúdo |
+|---|---|
+| `terraform/main.tf` | Providers (`aiven/aiven ~> 4.0`, `hashicorp/random`, `hashicorp/local`) e recursos |
+| `terraform/variables.tf` | Token (`sensitive`), projeto, prefixo, planos, região, nome do banco e do usuário, OpenSearch liga/desliga, `nome_servico_pg` para importar um serviço já existente |
+| `terraform/outputs.tf` | Host, porta, banco, estado e URIs (sensíveis) |
+| `terraform/terraform.tfvars.example` | Modelo das variáveis, sem valores reais |
+| `terraform/.terraform.lock.hcl` | Versões exatas dos providers, para o `init` ser reproduzível |
+
+### Tecnologias empregadas
+
+| Camada | Tecnologia |
+|---|---|
+| Infraestrutura como código | Terraform 1.17 com o provider Aiven |
+| Processamento | Python 3.12+, pandas 3.1, NumPy, PyArrow (Parquet) |
+| Acesso a banco | SQLAlchemy 2.1, psycopg 3 (`COPY`), API HTTP do OpenSearch |
+| Bancos | PostgreSQL 18 (esquema estrela, JSONB, full-text) e OpenSearch 3 |
+| Visualização | Streamlit 1.67 e Plotly 7 |
+| Qualidade e segurança | pytest (25 testes), `terraform validate`, gitleaks |
+
+### Decisões de infraestrutura
+
+* **Estado do Terraform local e fora do Git.** O `terraform.tfstate` guarda as senhas em texto, então não é
+  versionado. Um backend remoto (S3, Terraform Cloud) exigiria outra conta; para uma equipe pequena, a cópia
+  privada do arquivo basta.
+* **Serviço criado pelo console não é usado.** O assistente da Aiven obriga a criar um serviço no primeiro
+  acesso e sugere o plano pago `developer-1` (US$ 0,007/h). Esse serviço foi apagado e o Terraform criou os
+  planos gratuitos. Se alguém precisar aproveitar um serviço já criado, a variável `nome_servico_pg` e
+  `terraform import aiven_pg.pg <projeto>/<serviço>` trazem o serviço para o controle do Terraform.
+* **Região `do-nyc`.** É uma das regiões em que os planos gratuitos de PostgreSQL e OpenSearch existem ao mesmo
+  tempo (o OpenSearch gratuito só existe na DigitalOcean).
+
+---
+
+## 13. Segurança da informação
+
+**Nenhuma credencial está no repositório.** Cada segredo fica num cofre próprio e só chega a quem precisa dele.
+
+### Onde fica cada credencial
+
+| Credencial | Onde fica | Quem usa | Como é gerada |
+|---|---|---|---|
+| Token da API da Aiven | `terraform/terraform.tfvars` (ignorado pelo Git) ou variável `TF_VAR_aiven_api_token` | Terraform | Console Aiven → Tokens; revogar depois do provisionamento |
+| URI do administrador `avnadmin` (`DATABASE_URL`) | `.env` local (ignorado) e **GitHub Actions Secrets** | ETL | Gerada pela Aiven, gravada no `.env` pelo Terraform |
+| URI do OpenSearch (`OPENSEARCH_URL`) | `.env` local e GitHub Actions Secrets | ETL | Idem |
+| URI do leitor `dashboard_leitor` (`DASHBOARD_DATABASE_URL`) | `.streamlit/secrets.toml` local (ignorado) e **Streamlit Cloud Secrets** | Dashboard | Senha aleatória de 32 caracteres criada pelo Terraform |
+| Estado do Terraform (`terraform.tfstate`) | Só na máquina de quem provisionou (ignorado) + cópia privada | Terraform | Contém todas as senhas acima |
+
+O repositório só tem modelos sem valores reais: [`.env.example`](.env.example),
+[`terraform/terraform.tfvars.example`](terraform/terraform.tfvars.example) e
+[`.streamlit/secrets.toml.example`](.streamlit/secrets.toml.example).
+
+### Camadas de proteção
+
+1. **`.gitignore`** bloqueia `.env`, `.env.*`, `secrets.toml`, `terraform.tfvars`, `*.tfstate`, planos do
+   Terraform e a pasta de microdados brutos.
+2. **Varredura automática de segredos:** o CI roda o [gitleaks](https://github.com/gitleaks/gitleaks) sobre
+   todo o histórico do Git a cada push e falha se encontrar um token ou senha.
+3. **Menor privilégio:** o dashboard público usa `dashboard_leitor`, que só tem `USAGE` + `SELECT`. A senha de
+   administrador existe apenas no GitHub Actions, que é quem carrega os dados.
+4. **TLS obrigatório** (`sslmode=require`) em todas as conexões com a Aiven.
+5. **Saídas sensíveis:** as URIs com senha são marcadas `sensitive` no Terraform e não aparecem no log do `apply`.
+6. **SQL parametrizado** no dashboard; nomes de colunas vêm de uma lista fechada, sem concatenar texto do usuário.
+7. **LGPD:** nenhum dado pessoal identificável é gravado (seção 6).
+
+### Como verificar
+
+```bash
+git ls-files | grep -E "\.env$|tfstate|tfvars$|secrets\.toml$"   # não retorna nada
+gitleaks git --redact .                                         # "no leaks found"
+```
+
+O teste de privilégio foi feito contra o banco da Aiven: um `DELETE` com `dashboard_leitor` é recusado com
+`InsufficientPrivilege`.
+
+### Se uma credencial vazar
+
+* **Token da Aiven:** revogar em *Profile → Tokens* e gerar outro.
+* **Senha do leitor:** `terraform apply -replace="random_password.leitor"` gera uma nova; atualizar o Secret
+  do Streamlit.
+* **Senha do `avnadmin`:** redefinir no console da Aiven e atualizar o Secret `DATABASE_URL` do GitHub.
+
+---
+
+## 14. Dashboard dinâmico
 
 [`dashboard/app.py`](dashboard/app.py) · Streamlit + Plotly · consultas agregadas executadas no PostgreSQL.
 
@@ -463,25 +720,25 @@ tabela de dados disponível em cada gráfico.
 
 ---
 
-## 11. Segurança da informação
+## 15. Execução e reprodução (Deployment Guide)
 
-* **Nenhum segredo no repositório.** Token da Aiven via `TF_VAR_aiven_api_token`; URIs de banco via `.env`
-  (local), *Secrets* do GitHub Actions (ETL) e *Secrets* do Streamlit Cloud (dashboard). `.gitignore`
-  cobre `.env`, `secrets.toml`, `terraform.tfvars` e **`*.tfstate`** (o state contém senhas).
-* **Menor privilégio:** o Terraform cria o usuário `dashboard_leitor`; o ETL concede apenas
-  `USAGE` + `SELECT`. O dashboard **não consegue** alterar dados (testado: `DELETE` → *permission denied*).
-* **TLS obrigatório** (`sslmode=require`) em todas as conexões com a Aiven.
-* **SQL parametrizado** no dashboard; nomes de colunas/dimensões vêm de *whitelist*.
-* **Varredura de segredos** (gitleaks) em cada push no CI.
-* Senha do usuário leitor gerada pelo Terraform (`random_password`, 32 caracteres).
+### Ferramentas e dependências
 
----
+| Ferramenta | Versão usada | Para quê |
+|---|---|---|
+| Python | 3.12 ou superior | ETL e dashboard (dependências em `requirements.txt` e `dashboard/requirements.txt`) |
+| Terraform | 1.6 ou superior (testado com 1.17) | Provisionar a Aiven |
+| Git | qualquer recente | Clonar o repositório |
+| Conta Aiven | plano gratuito | Bancos de dados |
+| Conta GitHub e Streamlit Community Cloud | gratuitas | ETL agendado e dashboard online |
 
-## 12. Guia de reprodução (Deployment Guide)
+Espaço em disco: ~1,3 GB para os microdados baixados em `data/raw` (fora do Git).
 
-### Pré-requisitos
-* Python 3.12+ · Terraform 1.6+ · Git · conta gratuita na [Aiven](https://console.aiven.io) e no
-  [Streamlit Community Cloud](https://share.streamlit.io).
+### Sequência geral
+
+```
+1. instalar  →  2. token Aiven  →  3. terraform apply  →  4. ETL  →  5. exportar base  →  6. dashboard  →  7. publicar
+```
 
 ### Passo 1 — Clonar e instalar
 ```bash
@@ -493,46 +750,51 @@ pip install -r requirements.txt -r dashboard/requirements.txt
 pytest etl/tests -q                  # 25 testes das regras de negócio
 ```
 
-### Passo 2 — Token da Aiven
-Console Aiven → ícone do usuário → **Tokens** → *Generate token*. Anote também o nome do seu projeto.
-```bash
-export TF_VAR_aiven_api_token="<token>"     # PowerShell: $env:TF_VAR_aiven_api_token="<token>"
-export TF_VAR_aiven_project="<nome-do-projeto>"
-```
+### Passo 2 — Conta e token da Aiven
+1. Crie a conta em <https://console.aiven.io>. Se o assistente obrigar a criar um serviço, escolha o plano
+   **Free** (não o *Developer*, que é pago) e depois apague o serviço ou importe-o (seção 12).
+2. Ícone do usuário → **Tokens** → *Generate token*. Anote também o nome do projeto.
+3. Copie `terraform/terraform.tfvars.example` para `terraform/terraform.tfvars` e preencha `aiven_api_token`
+   e `aiven_project`. Esse arquivo é ignorado pelo Git. Alternativa sem arquivo:
+   `export TF_VAR_aiven_api_token="<token>"` (PowerShell: `$env:TF_VAR_aiven_api_token="<token>"`).
 
-### Passo 3 — Provisionar a infraestrutura (Terraform)
+### Passo 3 — Provisionar a infraestrutura
 ```bash
 cd terraform
 terraform init
-terraform plan          # mostra: aiven_pg, aiven_pg_database, aiven_pg_user, aiven_opensearch, local_sensitive_file
-terraform apply         # ~5–10 min até os serviços ficarem RUNNING
+terraform plan          # deve mostrar "6 to add": materna-pg, banco, usuário, senha, materna-os, .env
+terraform apply         # ~6 min até os serviços ficarem RUNNING
 cd ..
 ```
-O `apply` cria o arquivo `.env` na raiz com `DATABASE_URL`, `DASHBOARD_DATABASE_URL` e `OPENSEARCH_URL`.
-Para ver os valores: `terraform output -raw database_url_etl`.
+O `apply` grava o `.env` na raiz com `DATABASE_URL`, `DASHBOARD_DATABASE_URL` e `OPENSEARCH_URL`.
 Sem OpenSearch: `terraform apply -var="habilitar_opensearch=false"`.
 
-### Passo 4 — Rodar o ETL (carga inicial)
+### Passo 4 — Tratar e carregar os dados
 ```bash
-python -m etl.pipeline --anos 2019-2024      # ~20 min; baixa ~1,2 GB em data/raw (fora do Git)
+python -m etl.pipeline --anos 2019-2024      # ~20 min com download; ~10 min com os arquivos já baixados
 # teste rápido: ETL_AMOSTRA=0.1 python -m etl.pipeline --anos 2023
 ```
-Ao final o log mostra o tamanho do banco (deve ficar bem abaixo de 1 GB).
+O log mostra o relatório de qualidade de cada ano e, no fim, o tamanho do banco (158 MB esperados).
 
-### Passo 5 — Rodar o dashboard localmente
+### Passo 5 — Exportar a base tratada (opcional)
 ```bash
-streamlit run dashboard/app.py     # lê DASHBOARD_DATABASE_URL do .env
+python -m etl.exportar_base_tratada          # recria dados_tratados/ a partir do banco
 ```
 
-### Passo 6 — Publicar
-1. Suba o repositório no GitHub (confira que `.env` e `*.tfstate` **não** aparecem em `git status`).
+### Passo 6 — Dashboard local
+```bash
+streamlit run dashboard/app.py               # lê DASHBOARD_DATABASE_URL do .env
+```
+
+### Passo 7 — Publicar
+1. Suba o repositório no GitHub e confira que `.env`, `*.tfstate` e `terraform.tfvars` **não** aparecem em
+   `git status`.
 2. **GitHub → Settings → Secrets and variables → Actions:** crie `DATABASE_URL`, `DASHBOARD_DB_USER`
-   (= `dashboard_leitor`) e `OPENSEARCH_URL`. O workflow `ETL agendado` passa a rodar todo mês
-   (ou manualmente em *Actions → Run workflow*).
-3. **Streamlit Cloud → New app:** repositório, branch `main`, arquivo `dashboard/app.py`.
-   Em *Advanced settings → Secrets* cole o conteúdo de `.streamlit/secrets.toml.example` preenchido
-   com `terraform output -raw database_url_dashboard` (e `opensearch_url`).
-4. Atualize o link do dashboard no topo deste README.
+   (= `dashboard_leitor`) e `OPENSEARCH_URL`, com os valores do `.env`. O workflow *ETL agendado* passa a
+   rodar todo dia 5, ou manualmente em *Actions → Run workflow*.
+3. **Streamlit Cloud → Create app:** repositório, branch `main`, arquivo `dashboard/app.py`, Python 3.12+.
+   Em *Advanced settings → Secrets*, cole `.streamlit/secrets.toml.example` preenchido com
+   `terraform output -raw database_url_dashboard` (e `opensearch_url`).
 
 ### Destruir tudo
 ```bash
@@ -541,20 +803,20 @@ cd terraform && terraform destroy
 
 ---
 
-## 13. Roteiro sugerido para o pitch de 10 minutos
+## 16. Roteiro sugerido para o pitch de 10 minutos
 
 | Tempo | Conteúdo | O que mostrar |
 |---|---|---|
 | 0:00–1:30 | Problema e ODS 5/18 | KPI de RMM e risco relativo de mulheres pretas e indígenas |
-| 1:30–3:00 | Arquitetura e 5 V's | Diagrama da seção 2; volumes da seção 3 |
+| 1:30–3:00 | Arquitetura e 5 V's | Diagrama da seção 2; volumes da seção 4 |
 | 3:00–4:30 | Terraform | `terraform plan` / `apply` e serviços no console Aiven |
 | 4:30–6:00 | ETL e regras de negócio | Log do pipeline (chunks, dedup, relatório de qualidade); `regras_negocio.py` RN-02/RN-03/RN-07 |
 | 6:00–9:00 | Dashboard ao vivo | Filtrar Nordeste + pretas; trocar a métrica para cesárea eletiva; drill-down até um município; heatmap de RR; busca "hemorragia" |
-| 9:00–10:00 | LGPD, segurança e conclusões | Seção 5 e 11; achados principais |
+| 9:00–10:00 | LGPD, segurança e conclusões | Seções 6 e 13; achados principais |
 
 ---
 
-## 14. Limitações e referências
+## 17. Limitações e referências
 
 **Limitações**
 * Violência obstétrica não é registrada diretamente nos sistemas; os indicadores são **proxies** de
@@ -573,3 +835,6 @@ cd terraform && terraform destroy
 * Kotelchuck M. An evaluation of the Kessner Adequacy of Prenatal Care Index. *AJPH*, 1994.
 * IBGE. API de Localidades. · DATASUS. Tabela CID-10.
 * Lei nº 13.709/2018 (LGPD).
+
+---
+
