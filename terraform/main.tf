@@ -43,7 +43,7 @@ data "aiven_project" "projeto" {
 # -----------------------------------------------------------------------------
 resource "aiven_pg" "pg" {
   project      = data.aiven_project.projeto.project
-  service_name = "${var.prefixo}-pg"
+  service_name = var.nome_servico_pg != "" ? var.nome_servico_pg : "${var.prefixo}-pg"
   plan         = var.plano_postgres
   cloud_name   = var.cloud_name
 

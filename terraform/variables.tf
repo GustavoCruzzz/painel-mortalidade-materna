@@ -25,6 +25,16 @@ variable "prefixo" {
   }
 }
 
+variable "nome_servico_pg" {
+  description = <<-EOT
+    Nome de um PostgreSQL que já existe na Aiven (ex.: criado pelo assistente do console).
+    Vazio = usa "<prefixo>-pg". Para trazer um serviço existente para o Terraform:
+      terraform import aiven_pg.pg <projeto>/<nome_do_servico>
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "plano_postgres" {
   description = "Plano do PostgreSQL. free-1-1gb = Free Tier (1 GB de disco)."
   type        = string
