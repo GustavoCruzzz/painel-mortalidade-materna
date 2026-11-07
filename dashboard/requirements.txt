@@ -1,0 +1,7 @@
+# Dashboard Streamlit (pasta /dashboard) — usado pelo Streamlit Community Cloud
+streamlit==1.67.0
+plotly==7.1.0
+pandas==3.1.1
+SQLAlchemy==2.1.8
+psycopg[binary]==3.3.8
+requests==2.34.2

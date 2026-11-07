@@ -1,0 +1,23 @@
+# --- Segredos (NUNCA versionar) ---
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+
+# --- Estado do Terraform (contém senhas em texto) ---
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/crash.log
+terraform/.terraform.tfstate.lock.info
+
+# --- Dados (microdados baixados e camadas intermediárias) ---
+data/
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

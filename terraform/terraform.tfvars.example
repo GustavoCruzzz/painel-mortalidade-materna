@@ -1,0 +1,7 @@
+# Copie para terraform.tfvars (ignorado pelo Git) e preencha.
+# Alternativa recomendada: export TF_VAR_aiven_api_token="..." e não usar arquivo.
+
+aiven_api_token      = "COLE_SEU_TOKEN_AQUI"
+aiven_project        = "nome-do-seu-projeto-aiven"
+prefixo              = "materna"
+habilitar_opensearch = true

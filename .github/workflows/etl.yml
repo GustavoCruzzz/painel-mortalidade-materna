@@ -1,0 +1,59 @@
+# Velocidade: ingestão em lote agendada (batch) — roda todo dia 5 de cada mês e
+# reprocessa apenas os anos cuja base mudou no Portal de Dados Abertos do SUS.
+name: ETL agendado (SIM + SINASC -> Aiven)
+
+on:
+  schedule:
+    - cron: "0 6 5 * *"          # 03:00 (BRT) do dia 5 de cada mês
+  workflow_dispatch:
+    inputs:
+      anos:
+        description: "Anos a processar (ex.: 2023 | 2019-2024)"
+        default: "2019-2024"
+      incremental:
+        description: "Pular anos sem alteração na fonte"
+        type: boolean
+        default: true
+
+concurrency:
+  group: etl
+  cancel-in-progress: false
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Testes das regras de negócio
+        run: pytest etl/tests -q
+
+      - name: Cache dos microdados baixados
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: microdados-${{ github.run_id }}
+          restore-keys: microdados-
+
+      - name: Executar pipeline
+        env:
+          # Segredos configurados em Settings > Secrets and variables > Actions
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DASHBOARD_DB_USER: ${{ secrets.DASHBOARD_DB_USER }}
+          OPENSEARCH_URL: ${{ secrets.OPENSEARCH_URL }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          ANOS="${{ github.event.inputs.anos || '2019-2024' }}"
+          FLAG=""
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.incremental }}" = "true" ]; then
+            FLAG="--incremental"
+          fi
+          python -m etl.pipeline --anos "$ANOS" $FLAG
